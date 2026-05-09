@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="theme-color" content="#16213e">
+    <meta name="description" content="AI-powered skin disease scanner and diagnostic tool">
+    <title>DERMAI - AI Skin Scanner</title>
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    
+    <!-- Icons -->
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        html, body {
+            height: 100%;
+            overflow: hidden;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+        }
+        
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+        
+        .loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, #16213e 0%, #0f3460 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            z-index: 9999;
+            transition: opacity 0.5s ease;
+        }
+        
+        .app-logo {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #e94560 0%, #c73e54 100%);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(233, 69, 96, 0.3);
+        }
+        
+        .loading h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        
+        .loading p {
+            font-size: 16px;
+            opacity: 0.9;
+            margin-bottom: 20px;
+        }
+        
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255,255,255,0.2);
+            border-top-color: #e94560;
+            border-right-color: #e94560;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-bottom: 20px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .network-status {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            background: rgba(76, 175, 80, 0.95);
+            color: white;
+            z-index: 10000;
+            display: none;
+            backdrop-filter: blur(5px);
+            font-weight: 500;
+        }
+        
+        .network-status.offline {
+            background: rgba(244, 67, 54, 0.95);
+        }
+        
+        .retry-btn {
+            background: #e94560;
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 16px;
+            border-radius: 30px;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: transform 0.2s;
+        }
+        
+        .retry-btn:hover {
+            transform: scale(1.05);
+        }
+        
+        @media (max-width: 768px) {
+            .loading h1 { font-size: 22px; }
+            .app-logo { width: 65px; height: 65px; font-size: 32px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="network-status" id="networkStatus">📡 Offline</div>
+    
+    <div class="loading" id="loading">
+        <div class="app-logo">🩺</div>
+        <h1>DERMAI Scanner</h1>
+        <p>Initializing AI diagnostic engine...</p>
+        <div class="spinner"></div>
+        <p style="font-size: 12px; opacity: 0.6;">Loading DERMAI AI Scanner</p>
+    </div>
+    
+    <iframe 
+        id="appFrame" 
+        src="https://yousrarehman-derma-ai-scanner.hf.space"
+        allow="camera *; microphone *; geolocation *; storage-access"
+        allowfullscreen>
+    </iframe>
+    
+    <script>
+        const iframe = document.getElementById('appFrame');
+        const loading = document.getElementById('loading');
+        const networkStatus = document.getElementById('networkStatus');
+        
+        // Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('service-worker.js')
+                    .then(registration => {
+                        console.log('✅ Service Worker registered:', registration.scope);
+                    })
+                    .catch(error => {
+                        console.error('❌ Service Worker failed:', error);
+                    });
+            });
+        }
+        
+        function updateNetworkStatus() {
+            if (navigator.onLine) {
+                networkStatus.style.display = 'none';
+                console.log('✅ Network connected');
+                showToast('Back online! ✅', 'success');
+            } else {
+                networkStatus.style.display = 'block';
+                networkStatus.classList.add('offline');
+                networkStatus.innerHTML = '📡 No Internet Connection';
+                console.warn('⚠️ Network disconnected');
+                showToast('No internet connection! ⚠️', 'error');
+            }
+        }
+        
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.textContent = message;
+            toast.style.position = 'fixed';
+            toast.style.bottom = '20px';
+            toast.style.left = '20px';
+            toast.style.right = '20px';
+            toast.style.background = type === 'success' ? '#4caf50' : '#f44336';
+            toast.style.color = 'white';
+            toast.style.padding = '12px';
+            toast.style.borderRadius = '8px';
+            toast.style.textAlign = 'center';
+            toast.style.zIndex = '10001';
+            toast.style.fontSize = '14px';
+            toast.style.fontWeight = '500';
+            document.body.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+        
+        window.addEventListener('online', updateNetworkStatus);
+        window.addEventListener('offline', updateNetworkStatus);
+        updateNetworkStatus();
+        
+        iframe.onload = function() {
+            console.log('✅ DERMAI App loaded successfully');
+            loading.style.opacity = '0';
+            setTimeout(() => {
+                loading.style.display = 'none';
+            }, 500);
+            showToast('DERMAI is ready! 🩺', 'success');
+        };
+        
+        iframe.onerror = function() {
+            console.error('❌ Failed to load DERMAI app');
+            loading.innerHTML = `
+                <div class="app-logo">⚠️</div>
+                <h1>Connection Error</h1>
+                <p>Unable to reach DERMAI server</p>
+                <p style="font-size: 14px; opacity: 0.7;">Please check your internet connection</p>
+                <button class="retry-btn" onclick="window.location.reload()">Retry Connection</button>
+            `;
+        };
+        
+        setTimeout(() => {
+            if (loading.style.display !== 'none') {
+                console.warn('⚠️ Loading timeout - forcing hide');
+                loading.style.opacity = '0';
+                setTimeout(() => {
+                    loading.style.display = 'none';
+                }, 500);
+            }
+        }, 8000);
+        
+        async function requestCameraPermission() {
+            try {
+                if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                    stream.getTracks().forEach(track => track.stop());
+                    console.log('✅ Camera permission granted');
+                }
+            } catch (err) {
+                console.warn('⚠️ Camera permission denied:', err.message);
+            }
+        }
+        
+        document.body.addEventListener('click', () => {
+            requestCameraPermission();
+        }, { once: true });
+        
+        let deferredPrompt;
+        
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            console.log('✅ App can be installed');
+            
+            setTimeout(() => {
+                const installToast = document.createElement('div');
+                installToast.innerHTML = `
+                    <div style="position: fixed; bottom: 20px; left: 20px; right: 20px; 
+                                background: white; padding: 15px; border-radius: 12px; 
+                                box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 10002;">
+                        <strong style="color: #e94560;">📱 Install DERMAI</strong>
+                        <p style="font-size: 14px; margin: 8px 0; color: #333;">Get faster access and offline support</p>
+                        <button id="installPWA" style="background: #e94560; color: white; border: none; 
+                                padding: 10px 20px; border-radius: 8px; margin-right: 10px;">Install</button>
+                        <button id="closeInstall" style="background: #ccc; border: none; padding: 10px 20px; 
+                                border-radius: 8px;">Later</button>
+                    </div>
+                `;
+                document.body.appendChild(installToast);
+                
+                document.getElementById('installPWA').onclick = async () => {
+                    if (deferredPrompt) {
+                        deferredPrompt.prompt();
+                        const { outcome } = await deferredPrompt.userChoice;
+                        console.log(`User ${outcome} installation`);
+                        deferredPrompt = null;
+                    }
+                    installToast.remove();
+                };
+                
+                document.getElementById('closeInstall').onclick = () => {
+                    installToast.remove();
+                };
+            }, 2000);
+        });
+        
+        if (window.matchMedia('(display-mode: standalone)').matches) {
+            console.log('✅ App is running in standalone mode (installed)');
+        }
+        
+        console.log('🚀 DERMAI PWA Wrapper Initialized');
+    </script>
+</body>
+</html>
